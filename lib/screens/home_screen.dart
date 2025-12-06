@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:fridgetracker/screens/scan_product_screen.dart';
 import 'package:fridgetracker/screens/settings_screen.dart';
+import 'package:fridgetracker/screens/shopping_list_screen.dart';
 import 'package:provider/provider.dart';
 import '../models/inventory_item.dart';
 import '../services/database_service.dart';
@@ -302,12 +303,16 @@ class _HomeScreenState extends State<HomeScreen> {
                     color: Colors.orange,
                     onTap: _showRecipeSuggestions,
                   ),
+                  // Add this action card
                   _buildActionCard(
-                    title: 'Categories',
-                    icon: Icons.category,
-                    color: Colors.purple,
+                    title: 'Shopping List',
+                    icon: Icons.shopping_cart,
+                    color: Colors.blue,
                     onTap: () {
-                      // TODO: Navigate to categories screen
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => const ShoppingListScreen()),
+                      );
                     },
                   ),
                 ],

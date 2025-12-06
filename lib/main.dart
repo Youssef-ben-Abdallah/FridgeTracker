@@ -9,6 +9,36 @@ import 'package:provider/provider.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
+
+  Future<void> debugDumpDatabase() async {
+    final svc = DatabaseService();
+    svc.setDebug(true);
+
+    try {
+      final db = await svc.database;
+      print('[DB DEBUG] DB path: ${db.path}');
+
+      final productCountRow = await db.rawQuery('SELECT COUNT(*) as c FROM products');
+      final productCount = productCountRow.isNotEmpty ? productCountRow.first['c'] : 0;
+      print('[DB DEBUG] products count = $productCount');
+
+      final inventoryCountRow = await db.rawQuery('SELECT COUNT(*) as c FROM inventory');
+      final inventoryCount = inventoryCountRow.isNotEmpty ? inventoryCountRow.first['c'] : 0;
+      print('[DB DEBUG] inventory count = $inventoryCount');
+
+      final products = await db.rawQuery('SELECT * FROM products ORDER BY name LIMIT 10');
+      print('[DB DEBUG] sample products (${products.length}):');
+      for (final p in products) print('  $p');
+
+      final inventory = await db.rawQuery('SELECT * FROM inventory ORDER BY id DESC LIMIT 10');
+      print('[DB DEBUG] sample inventory (${inventory.length}):');
+      for (final i in inventory) print('  $i');
+
+    } catch (e, st) {
+      print('[DB DEBUG] exception: $e\n$st');
+    }
+  }
+  debugDumpDatabase();
   // Initialize services
   final databaseService = DatabaseService();
   await databaseService.database; // Initialize database

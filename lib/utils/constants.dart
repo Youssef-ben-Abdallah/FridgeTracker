@@ -92,4 +92,26 @@ class AppConstants {
     'Water',
     'Other'
   ];
+
+  // In AppConstants class, add:
+  static final Map<String, int> defaultMinimumStock = {
+    'Dairy': 2,
+    'Meat': 1,
+    'Produce': 3,
+    'Bakery': 1,
+    'Canned': 2,
+    'Frozen': 2,
+    'Beverages': 3,
+    'Snacks': 2,
+    'Condiments': 1,
+    'Grains': 1,
+    'Spices': 1,
+    'Oil': 1,
+    'Sauces': 1,
+    'Spread': 1,
+    'Cheese': 1,
+    'Yogurt': 2,
+    'Juice': 2,
+    'Water': 6,
+  };
 }

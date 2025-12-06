@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:fridgetracker/screens/scan_product_screen.dart';
 import 'package:provider/provider.dart';
 
 import '../models/inventory_item.dart';
@@ -585,10 +586,23 @@ class _InventoryScreenState extends State<InventoryScreen> {
       floatingActionButton: FloatingActionButton(
         onPressed: () {
           // TODO: Navigate to scan screen
+          _navigateToScanScreen();
         },
         backgroundColor: AppConstants.primaryColor,
         child: const Icon(Icons.add, color: Colors.white),
       ),
     );
+  }
+
+  void _navigateToScanScreen() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => ScanProductScreen(),
+      ),
+    ).then((_) {
+      // Refresh inventory when returning
+      _refreshInventory();
+    });
   }
 }
