@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:fridgetracker/screens/products_screen.dart';
 import 'package:fridgetracker/screens/scan_product_screen.dart';
 import 'package:fridgetracker/screens/settings_screen.dart';
 import 'package:fridgetracker/screens/shopping_list_screen.dart';
@@ -8,7 +9,6 @@ import '../services/database_service.dart';
 import '../services/recipe_service.dart';
 import '../utils/constants.dart';
 import '../widgets/expiration_indicator.dart';
-import 'add_product_screen.dart';
 import 'inventory_screen.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -273,7 +273,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 children: [
                   _buildActionCard(
                     title: 'View Inventory',
-                    icon: Icons.list_alt,
+                    icon: Icons.list_alt_rounded,
                     color: AppConstants.secondaryColor,
                     onTap: () {
                       Navigator.push(
@@ -284,26 +284,28 @@ class _HomeScreenState extends State<HomeScreen> {
                       );
                     },
                   ),
+
                   _buildActionCard(
-                    title: 'Add Product',
-                    icon: Icons.add_circle,
+                    title: 'View Products',
+                    icon: Icons.list_alt_rounded,
                     color: AppConstants.infoColor,
                     onTap: () {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (context) => const AddProductScreen(),
+                          builder: (context) => const ProductsScreen(),
                         ),
                       );
                     },
                   ),
+
                   _buildActionCard(
                     title: 'Recipes',
                     icon: Icons.restaurant_menu,
                     color: Colors.orange,
                     onTap: _showRecipeSuggestions,
                   ),
-                  // Add this action card
+
                   _buildActionCard(
                     title: 'Shopping List',
                     icon: Icons.shopping_cart,
@@ -318,40 +320,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 ],
               ),
 
-              // Recent Activity
-              const SizedBox(height: 24),
-              const Text(
-                'Tips',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 12),
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(12),
-                  child: Column(
-                    children: [
-                      ListTile(
-                        leading: const Icon(Icons.tips_and_updates, color: Colors.amber),
-                        title: const Text('First In, First Out'),
-                        subtitle: const Text('Use older items first to reduce waste'),
-                      ),
-                      ListTile(
-                        leading: const Icon(Icons.notifications, color: Colors.blue),
-                        title: const Text('Check Expiry Dates'),
-                        subtitle: const Text('Regularly check items expiring soon'),
-                      ),
-                      ListTile(
-                        leading: const Icon(Icons.restaurant, color: Colors.green),
-                        title: const Text('Plan Meals'),
-                        subtitle: const Text('Plan meals around items that will expire soon'),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
+              const SizedBox(height: 60),
             ],
           ),
         ),

@@ -244,6 +244,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
                 },
               ),
 
+
               // Category-based suggestion
               if (_selectedCategory != null &&
                   AppConstants.defaultExpirationDays.containsKey(_selectedCategory))

@@ -253,15 +253,7 @@ class _ScanProductScreenState extends State<ScanProductScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Scan Product'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.flash_on),
-            onPressed: () {
-              // TODO: Toggle flash
-            },
-          ),
-        ],
+        title: const Text('Scan Product')
       ),
       body: _cameraController == null || !_cameraController!.value.isInitialized
           ? const Center(
@@ -284,7 +276,6 @@ class _ScanProductScreenState extends State<ScanProductScreen> {
                 child: CircularProgressIndicator(),
               ),
             ),
-          // Scanner overlay
           Center(
             child: Container(
               width: 250,
@@ -295,22 +286,6 @@ class _ScanProductScreenState extends State<ScanProductScreen> {
               ),
             ),
           ),
-          // Instructions
-          Positioned(
-            top: 32,
-            left: 0,
-            right: 0,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              color: Colors.black54,
-              child: const Text(
-                'Position barcode within the frame',
-                textAlign: TextAlign.center,
-                style: TextStyle(color: Colors.white),
-              ),
-            ),
-          ),
-          // Scan button
           Positioned(
             bottom: 32,
             left: 0,

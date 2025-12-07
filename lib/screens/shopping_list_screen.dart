@@ -1,11 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/shopping_item.dart';
-import '../models/product.dart';
 import '../services/database_service.dart';
 import '../utils/constants.dart';
 import '../utils/helpers.dart';
-import '../widgets/expiration_indicator.dart';
 
 class ShoppingListScreen extends StatefulWidget {
   const ShoppingListScreen({super.key});
@@ -19,12 +17,16 @@ class _ShoppingListScreenState extends State<ShoppingListScreen> {
   List<ShoppingItem> _shoppingItems = [];
   String _searchQuery = '';
   bool _showPurchased = false;
-  int _selectedPriority = 0; // 0=All, 1=Low, 2=Medium, 3=High
+  String? _selectedCategory;
+  List<String> _categories = [];
 
   @override
   void initState() {
     super.initState();
     _loadShoppingList();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadCategories();
+    });
   }
 
   void _loadShoppingList() {
@@ -36,6 +38,30 @@ class _ShoppingListScreenState extends State<ShoppingListScreen> {
     setState(() {
       _loadShoppingList();
     });
+    await _loadCategories();
+  }
+
+  Future<void> _generateOutOfStockSuggestions() async {
+    try {
+      final dbService = Provider.of<DatabaseService>(context, listen: false);
+      final suggestions = await dbService.getLowStockSuggestions();
+
+      if (suggestions.isEmpty) {
+        Helpers.showSnackBar(context, 'All products are in stock!');
+        return;
+      }
+
+      final addedCount = await dbService.addSuggestionsToShoppingList(suggestions);
+
+      if (addedCount > 0) {
+        Helpers.showSnackBar(context, 'Added $addedCount ${addedCount == 1 ? 'item' : 'items'} that are out of stock');
+        _refreshShoppingList();
+      } else {
+        Helpers.showSnackBar(context, 'All out-of-stock items already in shopping list');
+      }
+    } catch (e) {
+      Helpers.showSnackBar(context, 'Error generating suggestions: $e', isError: true);
+    }
   }
 
   Future<void> _togglePurchasedStatus(ShoppingItem item) async {
@@ -83,20 +109,19 @@ class _ShoppingListScreenState extends State<ShoppingListScreen> {
     }
   }
 
-  Future<void> _updatePriority(ShoppingItem item, int newPriority) async {
-    try {
-      final dbService = Provider.of<DatabaseService>(context, listen: false);
-      final updatedItem = item.copyWith(priority: newPriority);
-      await dbService.updateShoppingItem(updatedItem);
-      _refreshShoppingList();
-    } catch (e) {
-      Helpers.showSnackBar(context, 'Error updating priority: $e', isError: true);
-    }
+  Future<void> _loadCategories() async {
+    final dbService = Provider.of<DatabaseService>(context, listen: false);
+    final shoppingItems = await dbService.getShoppingItems(includePurchased: _showPurchased);
+    final categories = shoppingItems.map((item) => item.category).toSet().toList();
+    categories.sort();
+
+    setState(() {
+      _categories = categories;
+    });
   }
 
   Future<void> _updateQuantity(ShoppingItem item, int newQuantity) async {
     if (newQuantity <= 0) {
-      // If quantity is 0 or negative, delete the item
       await _deleteItem(item);
       return;
     }
@@ -194,31 +219,6 @@ class _ShoppingListScreenState extends State<ShoppingListScreen> {
                     },
                   ),
                   const SizedBox(height: 16),
-                  DropdownButtonFormField<int>(
-                    value: selectedPriority,
-                    decoration: const InputDecoration(
-                      labelText: 'Priority',
-                    ),
-                    items: const [
-                      DropdownMenuItem(
-                        value: 1,
-                        child: Text('Low Priority'),
-                      ),
-                      DropdownMenuItem(
-                        value: 2,
-                        child: Text('Medium Priority'),
-                      ),
-                      DropdownMenuItem(
-                        value: 3,
-                        child: Text('High Priority'),
-                      ),
-                    ],
-                    onChanged: (value) {
-                      setState(() {
-                        selectedPriority = value!;
-                      });
-                    },
-                  ),
                 ],
               ),
             ),
@@ -281,36 +281,7 @@ class _ShoppingListScreenState extends State<ShoppingListScreen> {
                   children: [
                     Row(
                       children: [
-                        // Priority indicator
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: item.priorityColor.withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: item.priorityColor.withOpacity(0.3)),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(
-                                item.priorityIcon,
-                                size: 12,
-                                color: item.priorityColor,
-                              ),
-                              const SizedBox(width: 4),
-                              Text(
-                                item.priorityText,
-                                style: TextStyle(
-                                  fontSize: 10,
-                                  color: item.priorityColor,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
                         const SizedBox(width: 8),
-
                         // Item name
                         Expanded(
                           child: Text(
@@ -408,34 +379,16 @@ class _ShoppingListScreenState extends State<ShoppingListScreen> {
               // Actions
               Column(
                 children: [
-                  // Priority selector
                   PopupMenuButton<int>(
                     icon: const Icon(Icons.more_vert, size: 20),
                     itemBuilder: (context) => [
-                      const PopupMenuItem(
-                        value: 1,
-                        child: Text('Set Low Priority'),
-                      ),
-                      const PopupMenuItem(
-                        value: 2,
-                        child: Text('Set Medium Priority'),
-                      ),
-                      const PopupMenuItem(
-                        value: 3,
-                        child: Text('Set High Priority'),
-                      ),
-                      const PopupMenuDivider(),
                       const PopupMenuItem(
                         value: 0,
                         child: Text('Remove Item', style: TextStyle(color: Colors.red)),
                       ),
                     ],
                     onSelected: (value) {
-                      if (value == 0) {
-                        _deleteItem(item);
-                      } else {
-                        _updatePriority(item, value);
-                      }
+                      _deleteItem(item);
                     },
                   ),
                 ],
@@ -511,31 +464,10 @@ class _ShoppingListScreenState extends State<ShoppingListScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              Row(
+              Column(
                 children: [
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: item.priorityColor.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: item.priorityColor),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(item.priorityIcon, size: 16, color: item.priorityColor),
-                        const SizedBox(width: 6),
-                        Text(
-                          item.priorityText,
-                          style: TextStyle(
-                            color: item.priorityColor,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
+                    alignment: AlignmentDirectional.center,
                     child: Text(
                       item.name,
                       style: const TextStyle(
@@ -546,12 +478,9 @@ class _ShoppingListScreenState extends State<ShoppingListScreen> {
                   ),
                 ],
               ),
-
               const SizedBox(height: 16),
-
-              // Quantity
               ListTile(
-                leading: const Icon(Icons.format_list_numbered),
+                leading: const Icon(Icons.numbers),
                 title: const Text('Quantity Needed'),
                 subtitle: Text('${item.quantityNeeded} ${item.unit ?? 'pcs'}'),
                 trailing: IconButton(
@@ -563,7 +492,6 @@ class _ShoppingListScreenState extends State<ShoppingListScreen> {
                 ),
               ),
 
-              // Category
               ListTile(
                 leading: const Icon(Icons.category),
                 title: const Text('Category'),
@@ -578,14 +506,12 @@ class _ShoppingListScreenState extends State<ShoppingListScreen> {
                 ),
               ),
 
-              // Added date
               ListTile(
                 leading: const Icon(Icons.calendar_today),
                 title: const Text('Added Date'),
                 subtitle: Text(Helpers.formatTimestamp(item.addedAt)),
               ),
 
-              // Suggested by
               if (item.suggestedBy != null)
                 ListTile(
                   leading: const Icon(Icons.lightbulb),
@@ -593,7 +519,6 @@ class _ShoppingListScreenState extends State<ShoppingListScreen> {
                   subtitle: Text(_getSuggestionText(item.suggestedBy!)),
                 ),
 
-              // Notes
               if (item.notes != null && item.notes!.isNotEmpty)
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -672,12 +597,129 @@ class _ShoppingListScreenState extends State<ShoppingListScreen> {
       ).toList();
     }
 
-    // Apply priority filter
-    if (_selectedPriority > 0) {
-      filtered = filtered.where((item) => item.priority == _selectedPriority).toList();
+    // Apply category filter
+    if (_selectedCategory != null) {
+      filtered = filtered.where((item) => item.category == _selectedCategory).toList();
     }
 
     return filtered;
+  }
+
+  Widget _buildShoppingListByCategory(List<ShoppingItem> items) {
+    if (_selectedCategory != null) {
+      // If a category is selected, show all items in that category
+      return ListView.builder(
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        itemCount: items.length,
+        itemBuilder: (context, index) {
+          final item = items[index];
+          return _buildShoppingItem(item);
+        },
+      );
+    } else {
+      // Group by category
+      final Map<String, List<ShoppingItem>> categorized = {};
+
+      for (final item in items) {
+        if (!categorized.containsKey(item.category)) {
+          categorized[item.category] = [];
+        }
+        categorized[item.category]!.add(item);
+      }
+
+      final categories = categorized.keys.toList()..sort();
+
+      return ListView(
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        children: [
+          for (final category in categories)
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Category header
+                Padding(
+                  padding: const EdgeInsets.only(top: 16, bottom: 8, left: 8),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 12,
+                        height: 12,
+                        decoration: BoxDecoration(
+                          color: AppConstants.categoryColors[category] ?? Colors.grey,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        category,
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.grey,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade200,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text(
+                          '${categorized[category]!.length}',
+                          style: const TextStyle(fontSize: 12),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                // Items in this category
+                ...categorized[category]!.map((item) => _buildShoppingItem(item)),
+              ],
+            ),
+        ],
+      );
+    }
+  }
+
+  Widget _buildCategoryHeader(String category, int itemCount) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 16, bottom: 8, left: 8),
+      child: Row(
+        children: [
+          Container(
+            width: 12,
+            height: 12,
+            decoration: BoxDecoration(
+              color: AppConstants.categoryColors[category] ?? Colors.grey,
+              shape: BoxShape.circle,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            category,
+            style: const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: Colors.grey,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+            decoration: BoxDecoration(
+              color: Colors.grey.shade200,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Text(
+              '$itemCount',
+              style: const TextStyle(fontSize: 12),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -693,8 +735,8 @@ class _ShoppingListScreenState extends State<ShoppingListScreen> {
           ),
           IconButton(
             icon: const Icon(Icons.auto_awesome),
-            onPressed: _generateLowStockSuggestions,
-            tooltip: 'Generate Low Stock Suggestions',
+            onPressed: _generateOutOfStockSuggestions,
+            tooltip: 'Add Out-of-Stock Items',
           ),
         ],
       ),
@@ -729,33 +771,40 @@ class _ShoppingListScreenState extends State<ShoppingListScreen> {
                   children: [
                     // Priority filter
                     Expanded(
-                      child: DropdownButtonFormField<int>(
-                        value: _selectedPriority,
+                      child: DropdownButtonFormField<String>(
+                        value: _selectedCategory,
                         decoration: const InputDecoration(
-                          labelText: 'Priority',
+                          labelText: 'Category',
                           contentPadding: EdgeInsets.symmetric(horizontal: 12),
                         ),
-                        items: const [
-                          DropdownMenuItem(
-                            value: 0,
-                            child: Text('All Priorities'),
+                        items: [
+                          const DropdownMenuItem(
+                            value: null,
+                            child: Text('All Categories'),
                           ),
-                          DropdownMenuItem(
-                            value: 1,
-                            child: Text('Low Priority'),
-                          ),
-                          DropdownMenuItem(
-                            value: 2,
-                            child: Text('Medium Priority'),
-                          ),
-                          DropdownMenuItem(
-                            value: 3,
-                            child: Text('High Priority'),
-                          ),
+                          ..._categories.map((category) {
+                            return DropdownMenuItem(
+                              value: category,
+                              child: Row(
+                                children: [
+                                  Container(
+                                    width: 12,
+                                    height: 12,
+                                    decoration: BoxDecoration(
+                                      color: AppConstants.categoryColors[category] ?? Colors.grey,
+                                      shape: BoxShape.circle,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Text(category),
+                                ],
+                              ),
+                            );
+                          }).toList(),
                         ],
                         onChanged: (value) {
                           setState(() {
-                            _selectedPriority = value!;
+                            _selectedCategory = value;
                           });
                         },
                       ),

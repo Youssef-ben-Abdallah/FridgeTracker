@@ -281,21 +281,13 @@ class DatabaseService {
   }
 
   Future<int> updateProduct(Product product) async {
-    try {
-      final db = await database;
-      _log('updateProduct: updating ${product.barcode}', level: 800);
-      final rows = await db.update(
-        'products',
-        product.toMap(),
-        where: 'barcode = ?',
-        whereArgs: [product.barcode],
-      );
-      _log('updateProduct: updated $rows rows', level: 800);
-      return rows;
-    } catch (e, st) {
-      _log('updateProduct failed: $e', level: 1000, error: e, stackTrace: st);
-      rethrow;
-    }
+    final db = await database;
+    return await db.update(
+      'products',
+      product.toMap(),
+      where: 'barcode = ?',
+      whereArgs: [product.barcode],
+    );
   }
 
   Future<int> deleteProduct(String barcode) async {
@@ -693,20 +685,18 @@ class DatabaseService {
   Future<List<ShoppingItem>> getLowStockSuggestions() async {
     final db = await database;
 
-    // Get products with their current inventory count
+    // Get products that exist but have ZERO inventory
     final query = '''
     SELECT 
       p.barcode,
       p.name,
       p.category,
-      p.minimum_stock,
-      p.default_expiration_days,
-      COALESCE(SUM(i.quantity), 0) as current_stock
+      p.default_expiration_days
     FROM products p
     LEFT JOIN inventory i ON p.barcode = i.barcode AND i.is_consumed = 0
-    GROUP BY p.barcode, p.name, p.category, p.minimum_stock
-    HAVING current_stock < p.minimum_stock OR current_stock = 0
-    ORDER BY (p.minimum_stock - current_stock) DESC, p.name ASC
+    GROUP BY p.barcode, p.name, p.category
+    HAVING COUNT(i.id) = 0  -- No active inventory items
+    ORDER BY p.name ASC
   ''';
 
     final results = await db.rawQuery(query);
@@ -714,44 +704,22 @@ class DatabaseService {
     final List<ShoppingItem> suggestions = [];
 
     for (final row in results) {
-      final currentStock = (row['current_stock'] as int?) ?? 0;
-      final minimumStock = (row['minimum_stock'] as int?) ?? 1;
-      final needed = minimumStock - currentStock;
+      final suggestion = ShoppingItem(
+        productId: row['barcode'] as String,
+        name: row['name'] as String,
+        category: row['category'] as String,
+        quantityNeeded: 1, // Default to 1
+        unit: 'pcs', // Default unit
+        priority: 2, // Medium priority (out of stock)
+        addedAt: DateTime.now().millisecondsSinceEpoch,
+        suggestedBy: 'out_of_stock',
+      );
 
-      if (needed > 0) {
-        // Calculate priority based on how low stock is
-        final priority = _calculateStockPriority(currentStock, minimumStock);
-
-        final suggestion = ShoppingItem(
-          productId: row['barcode'] as String?,
-          name: row['name'] as String,
-          category: row['category'] as String,
-          quantityNeeded: needed,
-          unit: 'pcs', // Default unit
-          priority: priority,
-          addedAt: DateTime.now().millisecondsSinceEpoch,
-          suggestedBy: 'low_stock',
-        );
-
-        suggestions.add(suggestion);
-      }
+      suggestions.add(suggestion);
     }
 
+    print('📋 Found ${suggestions.length} out-of-stock items to suggest');
     return suggestions;
-  }
-
-  int _calculateStockPriority(int currentStock, int minimumStock) {
-    final percentage = (currentStock / minimumStock) * 100;
-
-    if (currentStock == 0) {
-      return 3; // High priority - completely out of stock
-    } else if (percentage <= 25) {
-      return 3; // High priority - very low stock
-    } else if (percentage <= 50) {
-      return 2; // Medium priority - low stock
-    } else {
-      return 1; // Low priority - slightly low stock
-    }
   }
 
 // Check if item already exists in shopping list
@@ -827,17 +795,6 @@ class DatabaseService {
       'categories': categories,
       'suggestedBy': suggestedItems,
     };
-  }
-
-// Update product minimum stock
-  Future<int> updateProductMinimumStock(String barcode, int minimumStock) async {
-    final db = await database;
-    return await db.update(
-      'products',
-      {'minimum_stock': minimumStock},
-      where: 'barcode = ?',
-      whereArgs: [barcode],
-    );
   }
 
 // Get products that need minimum stock setup

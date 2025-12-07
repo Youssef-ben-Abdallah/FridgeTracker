@@ -1,12 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:fridgetracker/screens/products_screen.dart';
 import 'package:fridgetracker/screens/scan_product_screen.dart';
 import 'package:provider/provider.dart';
 
 import '../models/inventory_item.dart';
+import '../models/product.dart';
 import '../services/database_service.dart';
 import '../utils/constants.dart';
 import '../utils/helpers.dart';
 import '../widgets/expiration_indicator.dart';
+import 'add_inventory_screen.dart';
 
 class InventoryScreen extends StatefulWidget {
   const InventoryScreen({super.key});
@@ -585,13 +588,67 @@ class _InventoryScreenState extends State<InventoryScreen> {
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () {
-          // TODO: Navigate to scan screen
-          _navigateToScanScreen();
+          _showAddInventoryDialog();
         },
         backgroundColor: AppConstants.primaryColor,
         child: const Icon(Icons.add, color: Colors.white),
       ),
     );
+  }
+
+  void _showAddInventoryDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Add to Inventory'),
+        content: const Text('How would you like to add an item?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _navigateToProductSelection();
+            },
+            child: const Text('Select from Products'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _navigateToScanScreen();
+            },
+            child: const Text('Scan Barcode'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _navigateToProductSelection() async {
+    final selectedProduct = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => ProductsScreen(
+          //isSelectionMode: true,
+        ),
+      ),
+    );
+
+    if (selectedProduct != null && selectedProduct is Product) {
+      // Navigate to add inventory screen
+      final added = await Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => AddInventoryScreen(product: selectedProduct),
+        ),
+      );
+
+      if (added == true) {
+        _refreshInventory();
+      }
+    }
   }
 
   void _navigateToScanScreen() {
